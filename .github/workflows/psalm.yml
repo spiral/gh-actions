@@ -11,11 +11,6 @@ on:
         description: PHP versions to test, separated by comma.
         required: true
         type: string
-      rector:
-        description: Run rector after psalm.
-        default: false
-        required: false
-        type: boolean
 
 jobs:
   psalm:
@@ -28,7 +23,6 @@ jobs:
       matrix:
         os: ${{ fromJson(inputs.os) }}
         php: ${{ fromJson(inputs.php) }}
-        rector: ${{ fromJson(inputs.rector) }}
 
     steps:
       - name: Set Git To Use LF
@@ -71,11 +65,6 @@ jobs:
           max_attempts: 5
           command: composer update --prefer-dist --no-interaction --no-progress
 
-      - name: Static Analysis (Psalm)
+      - name: Static Analysis
         run: |
           vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version=${{ matrix.php }}
-
-      - name: Static Analysis (Rector)
-        if: matrix.rector
-        run: |
-          vendor/bin/rector --dry-run
