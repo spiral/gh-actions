@@ -1,0 +1,114 @@
+name: phpunit
+
+on:
+  workflow_call:
+    inputs:
+      coverage:
+        description: Generate code coverage report.
+        default: pcov
+        required: false
+        type: string
+      extensions:
+        description: List of extensions to PHP.
+        default: sockets
+        required: false
+        type: string
+      ini-values:
+        description: Initial values for PHP configuration.
+        default: memory_limit=-1
+        required: false
+        type: string
+      os:
+        description: Os to test, separated by comma.
+        required: true
+        type: string
+      php:
+        description: PHP versions to test, separated by comma.
+        required: true
+        type: string
+      stability:
+        description: Stability to test, separated by comma.
+        required: true
+        type: string
+      tools:
+        description: Tools to test, separated by comma.
+        default: composer:v2
+        required: false
+        type: string
+
+jobs:
+  phpunit:
+    name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.stability }})
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ${{ fromJson(inputs.php) }}
+        os: ${{ fromJson(inputs.os) }}
+        stability: ${{ fromJson(inputs.stability) }}
+
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure environment
+        run: |
+          export COMPOSER_ROOT_VERSION=$(/usr/bin/jq --null-input --raw-output 'first(inputs["extra"]["branch-alias"])[]' composer.json)
+          echo COMPOSER_ROOT_VERSION=$COMPOSER_ROOT_VERSION >> $GITHUB_ENV
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # PHP Extras
+          extensions: ${{ matrix.extensions }}
+          coverage: ${{ matrix.coverage }}
+          tools: pecl
+          ini-values: ${{ matrix.ini-values }}
+
+      - name: Validate Composer
+        run: composer validate
+
+      - name: Get Composer Cache Directory
+        # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
+        id: composer-cache
+        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+
+      - name: Restore Composer Cache
+        uses: actions/cache@v2
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer
+
+      - name: Install Dependencies
+        uses: nick-invision/retry@v1
+        with:
+          timeout_minutes: 5
+          max_attempts: 5
+          command: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+
+      # Execution
+      - name: Execute Tests
+        run: vendor/bin/phpunit --coverage-clover=coverage.clover
+
+      - name: Upload Coverage To Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage.clover
+          fail_ci_if_error: false
+
+      - name: Upload coverage to Scrutinizer
+        continue-on-error: true # if it's fork
+        uses: sudo-bot/action-scrutinizer@latest
+        with:
+          cli-args: "--format=php-clover coverage.clover"
