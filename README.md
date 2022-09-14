@@ -36,6 +36,8 @@ jobs:
       #tools: composer:v2 
 ```
 
+PHPUnit config template is [here](phpunit.xml).
+
 ### Example of use of the action [PSALM](https://github.com/vimeo/psalm)
 
 ```yml
@@ -57,6 +59,8 @@ jobs:
       php: >-
         ['8.1']
 ```
+
+Psalm config template is [here](psalm.xml).
 
 ### Example of use of the action [Coding standarts](https://github.com/spiral/code-style)
 
@@ -80,6 +84,6 @@ jobs:
         ['8.1']
 ```
 
-License:
---------
+## License:
+
 MIT License (MIT). Please see [`LICENSE`](./LICENSE) for more information. Maintained by [Spiral Scout](https://spiralscout.com).
