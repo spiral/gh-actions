@@ -12,6 +12,7 @@
          processIsolation="false"
          stopOnFailure="false"
          stopOnError="false"
+         executionOrder="random"
          stderr="true"
 >
     <testsuites>
