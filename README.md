@@ -30,7 +30,9 @@ jobs:
       os: >-
         ['ubuntu-latest']
       php: >-
-        ['8.1']
+        ['8.1', '8.2']
+      stability: >-
+        ['prefer-lowest', 'prefer-stable']
       #tools: composer:v2 
 ```
 
