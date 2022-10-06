@@ -48,6 +48,9 @@ jobs:
         php: ${{ fromJson(inputs.php) }}
         os: ${{ fromJson(inputs.os) }}
         stability: ${{ fromJson(inputs.stability) }}
+        coverage: ${{ fromJson(inputs.coverage) }}
+        extensions: ${{ fromJson(inputs.extensions) }}
+        ini-values: ${{ fromJson(inputs.ini-values) }}
 
     steps:
       # General Steps
