@@ -53,6 +53,7 @@ jobs:
         php: ${{ fromJson(inputs.php) }}
         os: ${{ fromJson(inputs.os) }}
         stability: ${{ fromJson(inputs.stability) }}
+        extensions: ${{ fromJson(inputs.extensions) }}
 
     steps:
       # General Steps
