@@ -78,7 +78,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           # PHP Extras
-          extensions: ${{ matrix.extensions }}
+          extensions: ${{ inputs.extensions }}
           coverage: ${{ matrix.coverage }}
           tools: pecl
           ini-values: ${{ matrix.ini-values }}
