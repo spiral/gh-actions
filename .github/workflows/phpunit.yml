@@ -111,7 +111,7 @@ jobs:
           command: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
 
       - name: Build test server
-        run: docker build --tag test-server:local -f ./test-server/Dockerfile ./test-server
+        run: docker build --tag test-server:local -f ./tests/test-server/Dockerfile ./tests/test-server
         if: ${{ inputs.test-server }}
 
       - name: Run test server
