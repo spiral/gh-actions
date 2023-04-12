@@ -40,6 +40,11 @@ on:
         default: composer:v2
         required: false
         type: string
+      test-server:
+        description: Run test server.
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   phpunit:
@@ -104,6 +109,14 @@ jobs:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+
+      - name: Build test server
+        run: docker build --tag test-server:local -f ./test-server/Dockerfile ./test-server
+        if: ${{ inputs.test-server }}
+
+      - name: Run test server
+        run: docker run --name test-server --rm -d -p "7079:7079/tcp" test-server:local
+        if: ${{ inputs.test-server }}
 
       # Execution
       - name: Execute Tests
