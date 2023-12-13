@@ -29,7 +29,8 @@ on:
         type: string
       php:
         description: PHP versions to test, separated by comma.
-        required: true
+        default: ['8.1', '8.2', '8.3']
+        required: false
         type: string
       stability:
         description: Stability to test, separated by comma.
