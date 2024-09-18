@@ -1,11 +1,11 @@
-name: coding-standards
+name: coding-standards-fixer
 
 on:
   workflow_call:
     inputs:
       os:
-        description: Os to test, separated by comma.
-        required: false
+        description: Os to run the job on, separated by comma.
+        required: true
         default: '["ubuntu-latest"]'
         type: string
       php:
@@ -25,6 +25,14 @@ jobs:
       matrix:
         os: ${{ fromJson(inputs.os) }}
         php: ${{ fromJson(inputs.php) }}
+
+    permissions:
+      contents: write
+
+    timeout-minutes: 5
+    concurrency:
+      cancel-in-progress: true
+      group: coding-standards-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
     steps:
       - name: Set Git To Use LF
@@ -67,5 +75,14 @@ jobs:
           max_attempts: 5
           command: composer update --prefer-dist --no-interaction --no-progress
 
-      - name: Check Coding Standards
-        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --dry-run --using-cache=no
+      - name: Fix Code Style
+        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5.0.1
+        with:
+          commit_message: 'style(php-cs-fixer): fix coding standards'
+          branch: ${{ github.head_ref }}
+          commit_author: 'github-actions <github-actions@users.noreply.github.com>'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
