@@ -5,7 +5,7 @@ on:
     inputs:
       os:
         description: Os to run the job on, separated by comma.
-        required: true
+        required: false
         default: '["ubuntu-latest"]'
         type: string
       php:
