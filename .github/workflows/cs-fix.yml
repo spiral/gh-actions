@@ -73,7 +73,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 5
-          command: composer update --prefer-dist --no-interaction --no-progress
+          command: composer install --prefer-dist --no-interaction --no-progress
 
       - name: Fix Code Style
         run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no
