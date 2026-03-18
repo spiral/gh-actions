@@ -1,0 +1,95 @@
+name: phpunit
+
+on:
+  workflow_call:
+    inputs:
+      install_protoc:
+        description: Install protoc.
+        default: false
+        required: false
+        type: boolean
+      coverage:
+        description: Generate code coverage report.
+        default: pcov
+        required: false
+        type: string
+      extensions:
+        description: List of extensions to PHP.
+        default: sockets
+        required: false
+        type: string
+      ini-values:
+        description: Initial values for PHP configuration.
+        default: memory_limit=-1
+        required: false
+        type: string
+      os:
+        description: Os to test, separated by comma.
+        required: true
+        type: string
+      php:
+        description: PHP versions to test, separated by comma.
+        default: '["8.1","8.2","8.3","8.4","8.5"]'
+        required: false
+        type: string
+      dependencies:
+        description: Composer dependency versions to test, separated by comma.
+        default: '["highest"]'
+        required: false
+        type: string
+      run:
+        description: Command to run tests.
+        default: vendor/bin/testo
+        required: false
+        type: string
+
+jobs:
+  phpunit:
+    name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.stability }})
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ${{ fromJson(inputs.php) }}
+        os: ${{ fromJson(inputs.os) }}
+        dependencies: ${{ fromJson(inputs.dependencies) }}
+
+    steps:
+      # General Steps
+      - name: Set Git To Use LF
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        if: ${{ inputs.install_protoc }}
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure environment
+        run: |
+          export COMPOSER_ROOT_VERSION=$(/usr/bin/jq --null-input --raw-output 'first(inputs["extra"]["branch-alias"])[]' composer.json)
+          echo COMPOSER_ROOT_VERSION=$COMPOSER_ROOT_VERSION >> $GITHUB_ENV
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # PHP Extras
+          extensions: ${{ inputs.extensions }}
+          coverage: ${{ inputs.coverage }}
+          tools: pecl
+          ini-values: ${{ inputs.ini-values }}
+
+      - name: Install Composer dependencies
+        uses: ramsey/composer-install@v3
+        with:
+          dependency-versions: ${{ matrix.dependencies }}
+
+      # Execution
+      - name: Execute Tests
+        run: ${{ inputs.run }}
