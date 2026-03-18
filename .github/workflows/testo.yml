@@ -1,4 +1,4 @@
-name: phpunit
+name: testo
 
 on:
   workflow_call:
@@ -44,7 +44,7 @@ on:
         type: string
 
 jobs:
-  phpunit:
+  testo:
     name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.dependencies }})
 
     runs-on: ${{ matrix.os }}
