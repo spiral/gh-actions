@@ -12,9 +12,8 @@ nbproject
 # windows thumbnail cache
 Thumbs.db
 
-# composer vendor dir
+# composer files
 /vendor
-
 /composer.lock
 
 # composer itself is not needed
@@ -25,7 +24,5 @@ composer.phar
 
 # phpunit itself is not needed
 phpunit.phar
-# local phpunit config
-/phpunit.xml
 # phpunit cache
 .phpunit.result.cache
