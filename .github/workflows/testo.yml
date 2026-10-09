@@ -29,7 +29,7 @@ on:
         type: string
       php:
         description: PHP versions to test, separated by comma.
-        default: '["8.1","8.2","8.3","8.4","8.5"]'
+        default: '["8.2","8.3","8.4","8.5","8.6"]'
         required: false
         type: string
       dependencies:
@@ -42,12 +42,30 @@ on:
         default: vendor/bin/testo
         required: false
         type: string
+      test-server:
+        description: Build and run the test server from tests/test-server.
+        default: false
+        required: false
+        type: boolean
+      downgrade-paths:
+        description: Project paths downgraded by Rector on PHP 8.1, space-separated (Testo targets PHP 8.2).
+        default: tests testo.php
+        required: false
+        type: string
+      dload-cache:
+        description: Cache the DLoad version registry between runs (DLOAD_CACHE_DIR).
+        default: false
+        required: false
+        type: boolean
 
 jobs:
   testo:
     name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.dependencies }})
 
     runs-on: ${{ matrix.os }}
+
+    env:
+      DLOAD_CACHE_DIR: runtime/dload-cache
 
     strategy:
       fail-fast: false
@@ -70,10 +88,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Restore the DLoad version registry
+        if: ${{ inputs.dload-cache }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: runtime/dload-cache
+          key: dload-registry-${{ github.run_id }}-${{ strategy.job-index }}
+          restore-keys: dload-registry-
+
       - name: Configure environment
         run: |
-          export COMPOSER_ROOT_VERSION=$(/usr/bin/jq --null-input --raw-output 'first(inputs["extra"]["branch-alias"])[]' composer.json)
-          echo COMPOSER_ROOT_VERSION=$COMPOSER_ROOT_VERSION >> $GITHUB_ENV
+          version=$(/usr/bin/jq --raw-output 'first(.extra["branch-alias"][]?) // ""' composer.json)
+          if [ -n "$version" ]; then
+            echo "COMPOSER_ROOT_VERSION=$version" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
@@ -86,9 +114,28 @@ jobs:
           ini-values: ${{ inputs.ini-values }}
 
       - name: Install Composer dependencies
+        if: matrix.php != '8.1'
         uses: ramsey/composer-install@v3
         with:
           dependency-versions: ${{ matrix.dependencies }}
+          # PHP 8.6 is in development: allow dependencies that do not declare support yet
+          composer-options: ${{ matrix.php == '8.6' && '--ignore-platform-req=php' || '' }}
+
+      - name: Install and downgrade for PHP 8.1
+        if: matrix.php == '8.1'
+        uses: php-internal/actions/downgrade@v1
+        with:
+          php-version: '8.1'
+          dependency-versions: ${{ matrix.dependencies }}
+          paths: ${{ inputs.downgrade-paths }}
+
+      - name: Build test server
+        run: docker build --tag test-server:local -f ./tests/test-server/Dockerfile ./tests/test-server
+        if: ${{ inputs.test-server }}
+
+      - name: Run test server
+        run: docker run --name test-server --rm -d -p "7079:7079/tcp" test-server:local
+        if: ${{ inputs.test-server }}
 
       # Execution
       - name: Execute Tests
