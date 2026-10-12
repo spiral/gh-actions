@@ -58,7 +58,7 @@ on:
         required: false
         type: boolean
       codecov:
-        description: Write a Clover report via `--coverage-clover` and upload it to Codecov. The caller passes CODECOV_TOKEN, e.g. with `secrets: inherit`.
+        description: "Write a Clover report via `--coverage-clover` and upload it to Codecov. Pass the CODECOV_TOKEN secret explicitly: `secrets: inherit` does not cross organizations."
         default: false
         required: false
         type: boolean
