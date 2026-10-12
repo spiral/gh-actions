@@ -10,7 +10,7 @@ on:
         type: string
       php:
         description: PHP versions to test, separated by comma.
-        default: '["8.3"]'
+        default: '["8.1"]'
         required: false
         type: string
       composer-root-version:
