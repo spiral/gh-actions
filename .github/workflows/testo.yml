@@ -57,6 +57,14 @@ on:
         default: false
         required: false
         type: boolean
+      codecov:
+        description: Write a Clover report via `--coverage-clover` and upload it to Codecov. The caller passes CODECOV_TOKEN, e.g. with `secrets: inherit`.
+        default: false
+        required: false
+        type: boolean
+    secrets:
+      CODECOV_TOKEN:
+        required: false
 
 jobs:
   testo:
@@ -139,4 +147,13 @@ jobs:
 
       # Execution
       - name: Execute Tests
-        run: ${{ inputs.run }}
+        run: ${{ inputs.run }}${{ inputs.codecov && ' --coverage-clover=coverage.clover' || '' }}
+
+      - name: Upload coverage to Codecov
+        if: ${{ inputs.codecov }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.clover
+          name: php-${{ matrix.php }}-${{ matrix.os }}-${{ matrix.dependencies }}
+          fail_ci_if_error: false
