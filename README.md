@@ -56,6 +56,14 @@ jobs:
         ['8.1']
 ```
 
+### QA tools as [bamarni/composer-bin-plugin](https://github.com/bamarni/composer-bin-plugin) tools
+
+`psalm.yml` and `cs-fix.yml` install a bin tool when `<target-directory>/<bin-tool>/composer.json` exists
+(`target-directory` from `extra.bamarni-bin`, `vendor-bin` by default; `bin-tool` is `psalm` / `code-style` by default)
+and pick its config from the same directory (`psalm.xml` / `.php-cs-fixer.dist.php`); the `config` input overrides it.
+The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
+Repositories without a tool directory work as before.
+
 ### Example of use of the action [Coding standarts](https://github.com/spiral/code-style)
 
 ```yml
