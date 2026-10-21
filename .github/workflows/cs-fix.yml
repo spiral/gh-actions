@@ -9,14 +9,31 @@ on:
         default: '["ubuntu-latest"]'
         type: string
       php:
-        description: PHP versions to test, separated by comma.
-        default: '["8.1"]'
+        description: >-
+          PHP versions to run the fixer on, as a JSON array. This is the runtime PHP: the
+          code-style bin tool is installed for it, so it must satisfy the tool's PHP requirement
+          (spiral/code-style 2.4 needs PHP 8.2+).
+        default: '["8.2"]'
         required: false
         type: string
       composer-root-version:
         description: >-
           Explicit COMPOSER_ROOT_VERSION for the root package. When empty,
           falls back to the first `extra.branch-alias` value in composer.json.
+        default: ''
+        required: false
+        type: string
+      bin-tool:
+        description: >-
+          Name of the bamarni/composer-bin-plugin tool that holds PHP-CS-Fixer. When
+          `<target-directory>/<bin-tool>/composer.json` exists, it is installed with `composer bin`.
+        default: 'code-style'
+        required: false
+        type: string
+      config:
+        description: >-
+          PHP-CS-Fixer config path. When empty: `<target-directory>/<bin-tool>/.php-cs-fixer.dist.php`
+          if it exists, otherwise `.php-cs-fixer.dist.php`.
         default: ''
         required: false
         type: string
@@ -47,8 +64,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
 
+      # Credentials stay: the fixes are pushed back to the branch.
       - name: Checkout.
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Configure environment
         env:
@@ -73,7 +91,8 @@ jobs:
       - name: Get Composer Cache Directory
         # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
         id: composer-cache
-        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Composer Cache
         uses: actions/cache@v4
@@ -89,14 +108,69 @@ jobs:
           max_attempts: 5
           command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-reqs
 
-      - name: Fix Code Style
-        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no
+      - name: Detect bin tool
+        id: bin
+        shell: bash
+        env:
+          BIN_TOOL: ${{ inputs.bin-tool }}
+          CONFIG: ${{ inputs.config }}
+        run: |
+          # Defaults are bamarni/composer-bin-plugin's own.
+          read -r target bin_links forward < <(php -r '
+            $extra = json_decode(file_get_contents("composer.json"), true)["extra"]["bamarni-bin"] ?? [];
+            echo rtrim($extra["target-directory"] ?? "vendor-bin", "/"), " ",
+              var_export($extra["bin-links"] ?? true, true), " ",
+              var_export($extra["forward-command"] ?? false, true), "\n";
+          ')
+          dir="$target/$BIN_TOOL"
+          bin=vendor/bin
+          if [ -f "$dir/composer.json" ]; then
+            echo "dir=$dir" >> "$GITHUB_OUTPUT"
+            echo "forward=$forward" >> "$GITHUB_OUTPUT"
+            [ "$bin_links" = true ] || bin="$dir/vendor/bin"
+            if [ -z "$CONFIG" ] && [ -f "$dir/.php-cs-fixer.dist.php" ]; then
+              CONFIG="$dir/.php-cs-fixer.dist.php"
+            fi
+          fi
+          echo "bin=$bin" >> "$GITHUB_OUTPUT"
+          echo "config=${CONFIG:-.php-cs-fixer.dist.php}" >> "$GITHUB_OUTPUT"
 
+      - name: Install ${{ inputs.bin-tool }} bin tool
+        if: steps.bin.outputs.dir != ''
+        shell: bash
+        env:
+          BIN_TOOL: ${{ inputs.bin-tool }}
+          TOOL_DIR: ${{ steps.bin.outputs.dir }}
+          FORWARD: ${{ steps.bin.outputs.forward }}
+          PHP_VERSION: ${{ matrix.php }}
+        run: |
+          # With forward-command the root install already ran `composer bin all install --ignore-platform-reqs`,
+          # which may have resolved a tool this PHP cannot run. Start the tool over; a committed lock is kept.
+          if [ "$FORWARD" = true ]; then
+            rm -rf "$TOOL_DIR/vendor"
+            git ls-files --error-unmatch "$TOOL_DIR/composer.lock" > /dev/null 2>&1 || rm -f "$TOOL_DIR/composer.lock"
+          fi
+          if ! composer bin "$BIN_TOOL" install --no-interaction --no-progress; then
+            echo "::error title=Cannot install bin tool ${BIN_TOOL}::${TOOL_DIR}/composer.json cannot be installed on PHP ${PHP_VERSION} (see the Composer output above). If the tool needs another PHP version, set the \`php\` input of the cs-fix workflow to one it supports."
+            exit 1
+          fi
+
+      - name: Fix Code Style
+        shell: bash
+        env:
+          BIN: ${{ steps.bin.outputs.bin }}
+          CONFIG: ${{ steps.bin.outputs.config }}
+        run: |
+          "$BIN/php-cs-fixer" fix --config="$CONFIG" -vvv --using-cache=no
+
+      # Tracked files only: bin tool vendors and locks must never be committed, gitignored or not.
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5.0.1
         with:
           commit_message: 'style(php-cs-fixer): fix coding standards'
           branch: ${{ github.head_ref }}
           commit_author: 'github-actions <github-actions@users.noreply.github.com>'
+          status_options: '--untracked-files=no'
+          add_options: '-u'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
