@@ -74,6 +74,8 @@ jobs:
 
     env:
       DLOAD_CACHE_DIR: runtime/dload-cache
+      # DLoad runs from Composer scripts and from the tests; unauthenticated GitHub API calls share a 60 per hour limit per runner IP.
+      GITHUB_TOKEN: ${{ github.token }}
 
     strategy:
       fail-fast: false
