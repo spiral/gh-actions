@@ -80,6 +80,8 @@ jobs:
       command: composer cs:fix
 ```
 
+`psalm.yml` installs the dependencies with `--no-scripts`; pass `composer-no-scripts: false` if the analysis needs Composer scripts.
+
 The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
 `cs-fix.yml` installs the root dependencies ignoring only `ext-*` requirements,
 so its `php` also has to satisfy the PHP requirements of the repository and its dev dependencies.
