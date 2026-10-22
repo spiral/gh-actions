@@ -10,8 +10,8 @@ on:
         type: string
       php:
         description: >-
-          PHP versions to run the fixer on, as a JSON array. The root dependencies and the code-style
-          bin tool are installed for it (only `ext-*` requirements are ignored), so it must satisfy
+          PHP versions to run the fixer on, as a JSON array. The root dependencies and the bin tool
+          are installed for it (only `ext-*` requirements are ignored), so it must satisfy
           `require.php` of the repository and of the tool (spiral/code-style 2.4 needs PHP 8.2+).
         default: '["8.2"]'
         required: false
@@ -25,16 +25,14 @@ on:
         type: string
       bin-tool:
         description: >-
-          Name of the bamarni/composer-bin-plugin tool that holds PHP-CS-Fixer. When
-          `<target-directory>/<bin-tool>/composer.json` exists, it is installed with `composer bin`.
-        default: 'code-style'
+          bamarni/composer-bin-plugin tool to install with `composer bin <bin-tool> install`
+          after the root dependencies, e.g. `code-style`. Not installed when empty.
+        default: ''
         required: false
         type: string
-      config:
-        description: >-
-          PHP-CS-Fixer config path. When empty: `<target-directory>/<bin-tool>/.php-cs-fixer.dist.php`
-          if it exists, otherwise `.php-cs-fixer.dist.php`.
-        default: ''
+      command:
+        description: Command that runs the fixer, e.g. `composer cs:fix`.
+        default: 'vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no'
         required: false
         type: string
 
@@ -109,54 +107,18 @@ jobs:
           # Only extensions are ignored: the fixer does not need them, but it does need packages that run on this PHP.
           command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-req='ext-*'
 
-      - name: Detect bin tool
-        id: bin
-        shell: bash
-        env:
-          BIN_TOOL: ${{ inputs.bin-tool }}
-          CONFIG: ${{ inputs.config }}
-        run: |
-          # Defaults are bamarni/composer-bin-plugin's own.
-          read -r target bin_links < <(php -r '
-            $extra = json_decode(file_get_contents("composer.json"), true)["extra"]["bamarni-bin"] ?? [];
-            echo rtrim($extra["target-directory"] ?? "vendor-bin", "/"), " ", var_export($extra["bin-links"] ?? true, true), "\n";
-          ')
-          dir="$target/$BIN_TOOL"
-          if [ -f "$dir/composer.json" ]; then
-            if [ "$bin_links" != true ]; then
-              echo "::error title=bin-links is disabled::The workflow runs bin tools from the root vendor/bin, so it needs \`extra.bamarni-bin.bin-links: true\` in composer.json."
-              exit 1
-            fi
-            echo "dir=$dir" >> "$GITHUB_OUTPUT"
-            if [ -z "$CONFIG" ] && [ -f "$dir/.php-cs-fixer.dist.php" ]; then
-              CONFIG="$dir/.php-cs-fixer.dist.php"
-            fi
-          fi
-          echo "config=${CONFIG:-.php-cs-fixer.dist.php}" >> "$GITHUB_OUTPUT"
-
       - name: Install ${{ inputs.bin-tool }} bin tool
-        if: steps.bin.outputs.dir != ''
+        if: inputs.bin-tool != ''
         shell: bash
         env:
           BIN_TOOL: ${{ inputs.bin-tool }}
-          TOOL_DIR: ${{ steps.bin.outputs.dir }}
-          PHP_VERSION: ${{ matrix.php }}
-        run: |
-          if ! composer bin --help > /dev/null 2>&1; then
-            echo "::error title=Bin plugin is unavailable::${TOOL_DIR}/composer.json exists, but bamarni/composer-bin-plugin is not installed or not allowed at the root, so \`composer bin\` is unavailable. Require it in the root composer.json and allow it in \`config.allow-plugins\`."
-            exit 1
-          fi
-          if ! composer bin "$BIN_TOOL" install --no-interaction --no-progress; then
-            echo "::error title=Cannot install bin tool ${BIN_TOOL}::${TOOL_DIR}/composer.json cannot be installed on PHP ${PHP_VERSION} (see the Composer output above). If the tool needs another PHP version, set the \`php\` input of the cs-fix workflow to one it supports."
-            exit 1
-          fi
+        run: composer bin "$BIN_TOOL" install --no-interaction --no-progress
 
       - name: Fix Code Style
         shell: bash
         env:
-          CONFIG: ${{ steps.bin.outputs.config }}
-        run: |
-          vendor/bin/php-cs-fixer fix --config="$CONFIG" -vvv --using-cache=no
+          COMMAND: ${{ inputs.command }}
+        run: eval "$COMMAND"
 
       # Tracked files only: bin tool vendors and locks must never be committed, gitignored or not.
       - name: Commit and push changes

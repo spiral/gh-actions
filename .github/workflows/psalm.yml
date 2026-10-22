@@ -8,34 +8,21 @@ on:
         required: true
         type: string
       php:
-        description: >-
-          PHP versions to run Psalm on, as a JSON array. This is the runtime PHP: the root dependencies
-          and the Psalm bin tool are installed for it, so it must satisfy Psalm's own PHP requirement.
-          The PHP version the code is analysed for is set by `analysis-php`.
+        description: PHP versions to test, separated by comma.
         default: '["8.3"]'
-        required: false
-        type: string
-      analysis-php:
-        description: >-
-          PHP version Psalm analyses the code for (`--php-version`), independent of the runtime `php`.
-          When empty and Psalm is a bin tool, `--php-version` is not passed, so Psalm takes the minimum
-          version from `require.php` in composer.json, as a local run does. That composer.json is read from
-          Psalm's base directory, so a config in the tool directory needs `resolveFromConfigFile="false"`.
-          When empty without a bin tool, the runtime `php` version is used.
-        default: ''
         required: false
         type: string
       bin-tool:
         description: >-
-          Name of the bamarni/composer-bin-plugin tool that holds Psalm. When
-          `<target-directory>/<bin-tool>/composer.json` exists, it is installed with `composer bin`.
-        default: 'psalm'
+          bamarni/composer-bin-plugin tool to install with `composer bin <bin-tool> install`
+          after the root dependencies, e.g. `psalm`. Not installed when empty.
+        default: ''
         required: false
         type: string
-      config:
+      command:
         description: >-
-          Psalm config path. When empty: `<target-directory>/<bin-tool>/psalm.xml` if it exists,
-          otherwise Psalm's own lookup from the project root.
+          Command that runs Psalm, e.g. `composer psalm:ci`. When empty:
+          `vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version=<php>`.
         default: ''
         required: false
         type: string
@@ -96,58 +83,15 @@ jobs:
           max_attempts: 5
           command: composer update --prefer-dist --no-interaction --no-progress
 
-      - name: Detect bin tool
-        id: bin
-        shell: bash
-        env:
-          BIN_TOOL: ${{ inputs.bin-tool }}
-          CONFIG: ${{ inputs.config }}
-        run: |
-          # Defaults are bamarni/composer-bin-plugin's own.
-          read -r target bin_links < <(php -r '
-            $extra = json_decode(file_get_contents("composer.json"), true)["extra"]["bamarni-bin"] ?? [];
-            echo rtrim($extra["target-directory"] ?? "vendor-bin", "/"), " ", var_export($extra["bin-links"] ?? true, true), "\n";
-          ')
-          dir="$target/$BIN_TOOL"
-          if [ -f "$dir/composer.json" ]; then
-            if [ "$bin_links" != true ]; then
-              echo "::error title=bin-links is disabled::The workflow runs bin tools from the root vendor/bin, so it needs \`extra.bamarni-bin.bin-links: true\` in composer.json."
-              exit 1
-            fi
-            echo "dir=$dir" >> "$GITHUB_OUTPUT"
-            if [ -z "$CONFIG" ] && [ -f "$dir/psalm.xml" ]; then
-              CONFIG="$dir/psalm.xml"
-            fi
-          fi
-          echo "config=$CONFIG" >> "$GITHUB_OUTPUT"
-
       - name: Install ${{ inputs.bin-tool }} bin tool
-        if: steps.bin.outputs.dir != ''
+        if: inputs.bin-tool != ''
         shell: bash
         env:
           BIN_TOOL: ${{ inputs.bin-tool }}
-          TOOL_DIR: ${{ steps.bin.outputs.dir }}
-          PHP_VERSION: ${{ matrix.php }}
-        run: |
-          if ! composer bin --help > /dev/null 2>&1; then
-            echo "::error title=Bin plugin is unavailable::${TOOL_DIR}/composer.json exists, but bamarni/composer-bin-plugin is not installed or not allowed at the root, so \`composer bin\` is unavailable. Require it in the root composer.json and allow it in \`config.allow-plugins\`."
-            exit 1
-          fi
-          if ! composer bin "$BIN_TOOL" install --no-interaction --no-progress; then
-            echo "::error title=Cannot install bin tool ${BIN_TOOL}::${TOOL_DIR}/composer.json cannot be installed on PHP ${PHP_VERSION} (see the Composer output above). If the tool needs another PHP version, set the \`php\` input of the psalm workflow to one it supports."
-            exit 1
-          fi
+        run: composer bin "$BIN_TOOL" install --no-interaction --no-progress
 
       - name: Static Analysis
         shell: bash
         env:
-          CONFIG: ${{ steps.bin.outputs.config }}
-          TOOL_DIR: ${{ steps.bin.outputs.dir }}
-          ANALYSIS_PHP: ${{ inputs.analysis-php }}
-          PHP_VERSION: ${{ matrix.php }}
-        run: |
-          # Without a bin tool, keep analysing for the runtime PHP as before.
-          if [ -z "$ANALYSIS_PHP" ] && [ -z "$TOOL_DIR" ]; then
-            ANALYSIS_PHP="$PHP_VERSION"
-          fi
-          vendor/bin/psalm ${CONFIG:+"--config=$CONFIG"} --no-cache --shepherd --stats --output-format=checkstyle ${ANALYSIS_PHP:+"--php-version=$ANALYSIS_PHP"}
+          COMMAND: ${{ inputs.command || format('vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version={0}', matrix.php) }}
+        run: eval "$COMMAND"

@@ -58,20 +58,31 @@ jobs:
 
 ### QA tools as [bamarni/composer-bin-plugin](https://github.com/bamarni/composer-bin-plugin) tools
 
-`psalm.yml` and `cs-fix.yml` install a bin tool when `<target-directory>/<bin-tool>/composer.json` exists
-(`target-directory` from `extra.bamarni-bin`, `vendor-bin` by default; `bin-tool` is `psalm` / `code-style` by default)
-and pick its config from the same directory (`psalm.xml` / `.php-cs-fixer.dist.php`); the `config` input overrides it.
-The tool binaries are run from the root `vendor/bin`, so `extra.bamarni-bin.bin-links: false` is not supported.
-The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
-For psalm, `php` is only the runtime. With a Psalm bin tool, Psalm analyses the code for the minimum PHP from
-`require.php` in composer.json, as a local run does, whatever the runtime version is.
-Psalm reads that composer.json from its base directory, so a config in `tools/psalm` needs `resolveFromConfigFile="false"`
-(otherwise Psalm reads `tools/psalm/composer.json`).
-Set `analysis-php` (for example `'8.2'`) to analyse for another version.
-Repositories without a tool directory work as before.
+`psalm.yml` and `cs-fix.yml` take two optional inputs:
+`bin-tool` runs `composer bin <bin-tool> install` after the root install,
+and `command` replaces the command that runs the tool:
 
-`cs-fix.yml` installs the root dependencies for its `php` input ignoring only `ext-*` requirements,
-so that version has to satisfy the PHP requirements of the repository and its dev dependencies.
+```yml
+jobs:
+  psalm:
+    uses: spiral/gh-actions/.github/workflows/psalm.yml@master
+    with:
+      os: >-
+        ['ubuntu-latest']
+      php: >-
+        ['8.4']
+      bin-tool: psalm
+      command: composer psalm:ci
+  cs-fix:
+    uses: spiral/gh-actions/.github/workflows/cs-fix.yml@master
+    with:
+      bin-tool: code-style
+      command: composer cs:fix
+```
+
+The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
+`cs-fix.yml` installs the root dependencies ignoring only `ext-*` requirements,
+so its `php` also has to satisfy the PHP requirements of the repository and its dev dependencies.
 
 ### Example of use of the action [Coding standarts](https://github.com/spiral/code-style)
 
