@@ -106,19 +106,19 @@ jobs:
           # Defaults are bamarni/composer-bin-plugin's own.
           read -r target bin_links < <(php -r '
             $extra = json_decode(file_get_contents("composer.json"), true)["extra"]["bamarni-bin"] ?? [];
-            echo rtrim($extra["target-directory"] ?? "vendor-bin", "/"), " ",
-              var_export($extra["bin-links"] ?? true, true), "\n";
+            echo rtrim($extra["target-directory"] ?? "vendor-bin", "/"), " ", var_export($extra["bin-links"] ?? true, true), "\n";
           ')
           dir="$target/$BIN_TOOL"
-          bin=vendor/bin
           if [ -f "$dir/composer.json" ]; then
+            if [ "$bin_links" != true ]; then
+              echo "::error title=bin-links is disabled::The workflow runs bin tools from the root vendor/bin, so it needs \`extra.bamarni-bin.bin-links: true\` in composer.json."
+              exit 1
+            fi
             echo "dir=$dir" >> "$GITHUB_OUTPUT"
-            [ "$bin_links" = true ] || bin="$dir/vendor/bin"
             if [ -z "$CONFIG" ] && [ -f "$dir/psalm.xml" ]; then
               CONFIG="$dir/psalm.xml"
             fi
           fi
-          echo "bin=$bin" >> "$GITHUB_OUTPUT"
           echo "config=$CONFIG" >> "$GITHUB_OUTPUT"
 
       - name: Install ${{ inputs.bin-tool }} bin tool
@@ -141,7 +141,6 @@ jobs:
       - name: Static Analysis
         shell: bash
         env:
-          BIN: ${{ steps.bin.outputs.bin }}
           CONFIG: ${{ steps.bin.outputs.config }}
           TOOL_DIR: ${{ steps.bin.outputs.dir }}
           ANALYSIS_PHP: ${{ inputs.analysis-php }}
@@ -151,4 +150,4 @@ jobs:
           if [ -z "$ANALYSIS_PHP" ] && [ -z "$TOOL_DIR" ]; then
             ANALYSIS_PHP="$PHP_VERSION"
           fi
-          "$BIN/psalm" ${CONFIG:+"--config=$CONFIG"} --no-cache --shepherd --stats --output-format=checkstyle ${ANALYSIS_PHP:+"--php-version=$ANALYSIS_PHP"}
+          vendor/bin/psalm ${CONFIG:+"--config=$CONFIG"} --no-cache --shepherd --stats --output-format=checkstyle ${ANALYSIS_PHP:+"--php-version=$ANALYSIS_PHP"}

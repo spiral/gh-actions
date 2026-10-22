@@ -61,6 +61,7 @@ jobs:
 `psalm.yml` and `cs-fix.yml` install a bin tool when `<target-directory>/<bin-tool>/composer.json` exists
 (`target-directory` from `extra.bamarni-bin`, `vendor-bin` by default; `bin-tool` is `psalm` / `code-style` by default)
 and pick its config from the same directory (`psalm.xml` / `.php-cs-fixer.dist.php`); the `config` input overrides it.
+The tool binaries are run from the root `vendor/bin`, so `extra.bamarni-bin.bin-links: false` is not supported.
 The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
 For psalm, `php` is only the runtime. With a Psalm bin tool, Psalm analyses the code for the minimum PHP from
 `require.php` in composer.json, as a local run does, whatever the runtime version is.
