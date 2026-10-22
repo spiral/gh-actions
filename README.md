@@ -70,6 +70,9 @@ Psalm reads that composer.json from its base directory, so a config in `tools/ps
 Set `analysis-php` (for example `'8.2'`) to analyse for another version.
 Repositories without a tool directory work as before.
 
+`cs-fix.yml` installs the root dependencies for its `php` input ignoring only `ext-*` requirements,
+so that version has to satisfy the PHP requirements of the repository and its dev dependencies.
+
 ### Example of use of the action [Coding standarts](https://github.com/spiral/code-style)
 
 ```yml

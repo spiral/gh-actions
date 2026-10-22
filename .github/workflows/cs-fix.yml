@@ -10,9 +10,9 @@ on:
         type: string
       php:
         description: >-
-          PHP versions to run the fixer on, as a JSON array. This is the runtime PHP: the
-          code-style bin tool is installed for it, so it must satisfy the tool's PHP requirement
-          (spiral/code-style 2.4 needs PHP 8.2+).
+          PHP versions to run the fixer on, as a JSON array. The root dependencies and the code-style
+          bin tool are installed for it (only `ext-*` requirements are ignored), so it must satisfy
+          `require.php` of the repository and of the tool (spiral/code-style 2.4 needs PHP 8.2+).
         default: '["8.2"]'
         required: false
         type: string
@@ -106,7 +106,8 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 5
-          command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-reqs
+          # Only extensions are ignored: the fixer does not need them, but it does need packages that run on this PHP.
+          command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-req='ext-*'
 
       - name: Detect bin tool
         id: bin
