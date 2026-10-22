@@ -127,6 +127,7 @@ jobs:
           if [ -f "$dir/composer.json" ]; then
             echo "dir=$dir" >> "$GITHUB_OUTPUT"
             echo "forward=$forward" >> "$GITHUB_OUTPUT"
+            echo "bin-links=$bin_links" >> "$GITHUB_OUTPUT"
             [ "$bin_links" = true ] || bin="$dir/vendor/bin"
             if [ -z "$CONFIG" ] && [ -f "$dir/.php-cs-fixer.dist.php" ]; then
               CONFIG="$dir/.php-cs-fixer.dist.php"
@@ -142,11 +143,26 @@ jobs:
           BIN_TOOL: ${{ inputs.bin-tool }}
           TOOL_DIR: ${{ steps.bin.outputs.dir }}
           FORWARD: ${{ steps.bin.outputs.forward }}
+          BIN_LINKS: ${{ steps.bin.outputs.bin-links }}
           PHP_VERSION: ${{ matrix.php }}
         run: |
+          if ! composer bin --help > /dev/null 2>&1; then
+            echo "::error title=Bin plugin is unavailable::${TOOL_DIR}/composer.json exists, but bamarni/composer-bin-plugin is not installed or not allowed at the root, so \`composer bin\` is unavailable. Require it in the root composer.json and allow it in \`config.allow-plugins\`."
+            exit 1
+          fi
           # With forward-command the root install already ran `composer bin all install --ignore-platform-reqs`,
           # which may have resolved a tool this PHP cannot run. Start the tool over; a committed lock is kept.
           if [ "$FORWARD" = true ]; then
+            # Composer skips a bin link whose name is taken, so drop the tool's own proxies to have them recreated.
+            if [ "$BIN_LINKS" = true ]; then
+              for proxy in vendor/bin/*; do
+                if [ -L "$proxy" ]; then
+                  case "$(readlink "$proxy")" in *"$TOOL_DIR/vendor/"*) rm -f "$proxy" ;; esac
+                elif grep -qsF "$TOOL_DIR/vendor/" "$proxy"; then
+                  rm -f "$proxy"
+                fi
+              done
+            fi
             rm -rf "$TOOL_DIR/vendor"
             git ls-files --error-unmatch "$TOOL_DIR/composer.lock" > /dev/null 2>&1 || rm -f "$TOOL_DIR/composer.lock"
           fi

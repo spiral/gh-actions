@@ -64,6 +64,8 @@ and pick its config from the same directory (`psalm.xml` / `.php-cs-fixer.dist.p
 The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
 For psalm, `php` is only the runtime. With a Psalm bin tool, Psalm analyses the code for the minimum PHP from
 `require.php` in composer.json, as a local run does, whatever the runtime version is.
+Psalm reads that composer.json from its base directory, so a config in `tools/psalm` needs `resolveFromConfigFile="false"`
+(otherwise Psalm reads `tools/psalm/composer.json`).
 Set `analysis-php` (for example `'8.2'`) to analyse for another version.
 Repositories without a tool directory work as before.
 

@@ -19,8 +19,9 @@ on:
         description: >-
           PHP version Psalm analyses the code for (`--php-version`), independent of the runtime `php`.
           When empty and Psalm is a bin tool, `--php-version` is not passed, so Psalm takes the minimum
-          version from `require.php` in composer.json, as a local run does. When empty without a bin tool,
-          the runtime `php` version is used.
+          version from `require.php` in composer.json, as a local run does. That composer.json is read from
+          Psalm's base directory, so a config in the tool directory needs `resolveFromConfigFile="false"`.
+          When empty without a bin tool, the runtime `php` version is used.
         default: ''
         required: false
         type: string
@@ -128,6 +129,10 @@ jobs:
           TOOL_DIR: ${{ steps.bin.outputs.dir }}
           PHP_VERSION: ${{ matrix.php }}
         run: |
+          if ! composer bin --help > /dev/null 2>&1; then
+            echo "::error title=Bin plugin is unavailable::${TOOL_DIR}/composer.json exists, but bamarni/composer-bin-plugin is not installed or not allowed at the root, so \`composer bin\` is unavailable. Require it in the root composer.json and allow it in \`config.allow-plugins\`."
+            exit 1
+          fi
           if ! composer bin "$BIN_TOOL" install --no-interaction --no-progress; then
             echo "::error title=Cannot install bin tool ${BIN_TOOL}::${TOOL_DIR}/composer.json cannot be installed on PHP ${PHP_VERSION} (see the Composer output above). If the tool needs another PHP version, set the \`php\` input of the psalm workflow to one it supports."
             exit 1
