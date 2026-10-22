@@ -11,8 +11,17 @@ on:
         description: >-
           PHP versions to run Psalm on, as a JSON array. This is the runtime PHP: the root dependencies
           and the Psalm bin tool are installed for it, so it must satisfy Psalm's own PHP requirement.
-          Psalm also analyses the code for this version (`--php-version`).
+          The PHP version the code is analysed for is set by `analysis-php`.
         default: '["8.3"]'
+        required: false
+        type: string
+      analysis-php:
+        description: >-
+          PHP version Psalm analyses the code for (`--php-version`), independent of the runtime `php`.
+          When empty and Psalm is a bin tool, `--php-version` is not passed, so Psalm takes the minimum
+          version from `require.php` in composer.json, as a local run does. When empty without a bin tool,
+          the runtime `php` version is used.
+        default: ''
         required: false
         type: string
       bin-tool:
@@ -129,6 +138,12 @@ jobs:
         env:
           BIN: ${{ steps.bin.outputs.bin }}
           CONFIG: ${{ steps.bin.outputs.config }}
+          TOOL_DIR: ${{ steps.bin.outputs.dir }}
+          ANALYSIS_PHP: ${{ inputs.analysis-php }}
           PHP_VERSION: ${{ matrix.php }}
         run: |
-          "$BIN/psalm" ${CONFIG:+"--config=$CONFIG"} --no-cache --shepherd --stats --output-format=checkstyle --php-version="$PHP_VERSION"
+          # Without a bin tool, keep analysing for the runtime PHP as before.
+          if [ -z "$ANALYSIS_PHP" ] && [ -z "$TOOL_DIR" ]; then
+            ANALYSIS_PHP="$PHP_VERSION"
+          fi
+          "$BIN/psalm" ${CONFIG:+"--config=$CONFIG"} --no-cache --shepherd --stats --output-format=checkstyle ${ANALYSIS_PHP:+"--php-version=$ANALYSIS_PHP"}
