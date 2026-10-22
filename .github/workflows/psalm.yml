@@ -26,6 +26,13 @@ on:
         default: ''
         required: false
         type: string
+      composer-no-scripts:
+        description: >-
+          Install the dependencies with `composer update --no-scripts`, skipping hooks such as `post-update-cmd`:
+          the analysis rarely needs them, and they may download binaries. Set to `false` to run the scripts.
+        default: true
+        required: false
+        type: boolean
 
 jobs:
   psalm:
@@ -81,7 +88,7 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 5
-          command: composer update --prefer-dist --no-interaction --no-progress
+          command: composer update --prefer-dist --no-interaction --no-progress ${{ inputs.composer-no-scripts && '--no-scripts' || '' }}
 
       - name: Install ${{ inputs.bin-tool }} bin tool
         if: inputs.bin-tool != ''
