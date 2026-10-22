@@ -107,8 +107,9 @@ jobs:
           restore-keys: dload-registry-
 
       - name: Configure environment
+        shell: bash
         run: |
-          version=$(/usr/bin/jq --raw-output 'first(.extra["branch-alias"][]?) // ""' composer.json)
+          version=$(jq --raw-output 'first(.extra["branch-alias"][]?) // ""' composer.json)
           if [ -n "$version" ]; then
             echo "COMPOSER_ROOT_VERSION=$version" >> "$GITHUB_ENV"
           fi
