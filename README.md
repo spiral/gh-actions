@@ -56,6 +56,34 @@ jobs:
         ['8.1']
 ```
 
+### QA tools as [bamarni/composer-bin-plugin](https://github.com/bamarni/composer-bin-plugin) tools
+
+`psalm.yml` and `cs-fix.yml` take two optional inputs:
+`bin-tool` runs `composer bin <bin-tool> install` after the root install,
+and `command` replaces the command that runs the tool:
+
+```yml
+jobs:
+  psalm:
+    uses: spiral/gh-actions/.github/workflows/psalm.yml@master
+    with:
+      os: >-
+        ['ubuntu-latest']
+      php: >-
+        ['8.4']
+      bin-tool: psalm
+      command: composer psalm:ci
+  cs-fix:
+    uses: spiral/gh-actions/.github/workflows/cs-fix.yml@master
+    with:
+      bin-tool: code-style
+      command: composer cs:fix
+```
+
+The tool is installed for the `php` input version, so that version has to satisfy the tool's PHP requirement.
+`cs-fix.yml` installs the root dependencies ignoring only `ext-*` requirements,
+so its `php` also has to satisfy the PHP requirements of the repository and its dev dependencies.
+
 ### Example of use of the action [Coding standarts](https://github.com/spiral/code-style)
 
 ```yml

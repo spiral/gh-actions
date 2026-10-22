@@ -9,8 +9,11 @@ on:
         default: '["ubuntu-latest"]'
         type: string
       php:
-        description: PHP versions to test, separated by comma.
-        default: '["8.1"]'
+        description: >-
+          PHP versions to run the fixer on, as a JSON array. The root dependencies and the bin tool
+          are installed for it (only `ext-*` requirements are ignored), so it must satisfy
+          `require.php` of the repository and of the tool (spiral/code-style 2.4 needs PHP 8.2+).
+        default: '["8.2"]'
         required: false
         type: string
       composer-root-version:
@@ -18,6 +21,18 @@ on:
           Explicit COMPOSER_ROOT_VERSION for the root package. When empty,
           falls back to the first `extra.branch-alias` value in composer.json.
         default: ''
+        required: false
+        type: string
+      bin-tool:
+        description: >-
+          bamarni/composer-bin-plugin tool to install with `composer bin <bin-tool> install`
+          after the root dependencies, e.g. `code-style`. Not installed when empty.
+        default: ''
+        required: false
+        type: string
+      command:
+        description: Command that runs the fixer, e.g. `composer cs:fix`.
+        default: 'vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no'
         required: false
         type: string
 
@@ -47,8 +62,9 @@ jobs:
           git config --global core.autocrlf false
           git config --global core.eol lf
 
+      # Credentials stay: the fixes are pushed back to the branch.
       - name: Checkout.
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Configure environment
         env:
@@ -73,7 +89,8 @@ jobs:
       - name: Get Composer Cache Directory
         # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
         id: composer-cache
-        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Composer Cache
         uses: actions/cache@v4
@@ -87,16 +104,30 @@ jobs:
         with:
           timeout_minutes: 5
           max_attempts: 5
-          command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-reqs
+          # Only extensions are ignored: the fixer does not need them, but it does need packages that run on this PHP.
+          command: composer install --prefer-dist --no-interaction --no-progress --ignore-platform-req='ext-*'
+
+      - name: Install ${{ inputs.bin-tool }} bin tool
+        if: inputs.bin-tool != ''
+        shell: bash
+        env:
+          BIN_TOOL: ${{ inputs.bin-tool }}
+        run: composer bin "$BIN_TOOL" install --no-interaction --no-progress
 
       - name: Fix Code Style
-        run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php -vvv --using-cache=no
+        shell: bash
+        env:
+          COMMAND: ${{ inputs.command }}
+        run: eval "$COMMAND"
 
+      # Tracked files only: bin tool vendors and locks must never be committed, gitignored or not.
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v5.0.1
         with:
           commit_message: 'style(php-cs-fixer): fix coding standards'
           branch: ${{ github.head_ref }}
           commit_author: 'github-actions <github-actions@users.noreply.github.com>'
+          status_options: '--untracked-files=no'
+          add_options: '-u'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

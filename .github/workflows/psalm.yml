@@ -12,6 +12,20 @@ on:
         default: '["8.3"]'
         required: false
         type: string
+      bin-tool:
+        description: >-
+          bamarni/composer-bin-plugin tool to install with `composer bin <bin-tool> install`
+          after the root dependencies, e.g. `psalm`. Not installed when empty.
+        default: ''
+        required: false
+        type: string
+      command:
+        description: >-
+          Command that runs Psalm, e.g. `composer psalm:ci`. When empty:
+          `vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version=<php>`.
+        default: ''
+        required: false
+        type: string
 
 jobs:
   psalm:
@@ -32,7 +46,9 @@ jobs:
           git config --global core.eol lf
 
       - name: Checkout.
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Configure environment
         run: |
@@ -50,7 +66,8 @@ jobs:
       - name: Get Composer Cache Directory
         # Docs: <https://github.com/actions/cache/blob/master/examples.md#php---composer>
         id: composer-cache
-        run: echo "::set-output name=dir::$(composer config cache-files-dir)"
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Composer Cache
         uses: actions/cache@v4
@@ -60,21 +77,21 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ matrix.php }}-composer
 
       - name: Install Dependencies
-        if: matrix.php-version != '8.2'
         uses: nick-invision/retry@v2
         with:
           timeout_minutes: 5
           max_attempts: 5
           command: composer update --prefer-dist --no-interaction --no-progress
 
-      - name: Install Dependencies (ignore platform reqs)
-        if: matrix.php-version == '8.2'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 5
-          max_attempts: 5
-          command: composer update --prefer-dist --no-interaction --no-progress --ignore-platform-reqs
+      - name: Install ${{ inputs.bin-tool }} bin tool
+        if: inputs.bin-tool != ''
+        shell: bash
+        env:
+          BIN_TOOL: ${{ inputs.bin-tool }}
+        run: composer bin "$BIN_TOOL" install --no-interaction --no-progress
 
       - name: Static Analysis
-        run: |
-          vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version=${{ matrix.php }}
+        shell: bash
+        env:
+          COMMAND: ${{ inputs.command || format('vendor/bin/psalm --no-cache --shepherd --stats --output-format=checkstyle --php-version={0}', matrix.php) }}
+        run: eval "$COMMAND"
