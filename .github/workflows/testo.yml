@@ -97,6 +97,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Restore the DLoad version registry
         if: ${{ inputs.dload-cache }}
