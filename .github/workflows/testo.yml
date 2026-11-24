@@ -62,13 +62,23 @@ on:
         default: false
         required: false
         type: boolean
+      codecov-php:
+        description: With `codecov`, collect and upload coverage only in the jobs of this PHP version; the other jobs run without a coverage driver. Empty means every job.
+        default: ''
+        required: false
+        type: string
+      codecov-dependencies:
+        description: With `codecov`, collect and upload coverage only in the jobs of this dependency set (`lowest` or `highest`). Empty means every job.
+        default: ''
+        required: false
+        type: string
     secrets:
       CODECOV_TOKEN:
         required: false
 
 jobs:
   testo:
-    name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.dependencies }})
+    name: PHP ${{ matrix.php }}-${{ matrix.os }}, ${{ matrix.dependencies }}
 
     runs-on: ${{ matrix.os }}
 
@@ -76,6 +86,7 @@ jobs:
       DLOAD_CACHE_DIR: runtime/dload-cache
       # DLoad runs from Composer scripts and from the tests; unauthenticated GitHub API calls share a 60 per hour limit per runner IP.
       GITHUB_TOKEN: ${{ github.token }}
+      CODECOV_JOB: ${{ inputs.codecov && (inputs.codecov-php == '' || inputs.codecov-php == matrix.php) && (inputs.codecov-dependencies == '' || inputs.codecov-dependencies == matrix.dependencies) }}
 
     strategy:
       fail-fast: false
@@ -92,11 +103,11 @@ jobs:
           git config --global core.eol lf
 
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@149f6c87b92550901b26acd1632e11c3662e381f # v1
         if: ${{ inputs.install_protoc }}
 
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -117,18 +128,18 @@ jobs:
           fi
 
       - name: Setup PHP ${{ matrix.php }}
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           # PHP Extras
           extensions: ${{ inputs.extensions }}
-          coverage: ${{ inputs.coverage }}
+          coverage: ${{ (inputs.codecov && env.CODECOV_JOB != 'true') && 'none' || inputs.coverage }}
           tools: pecl
           ini-values: ${{ inputs.ini-values }}
 
       - name: Install Composer dependencies
         if: matrix.php != '8.1'
-        uses: ramsey/composer-install@v3
+        uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
         with:
           dependency-versions: ${{ matrix.dependencies }}
           # PHP 8.6 is in development: allow dependencies that do not declare support yet
@@ -136,7 +147,7 @@ jobs:
 
       - name: Install and downgrade for PHP 8.1
         if: matrix.php == '8.1'
-        uses: php-internal/actions/downgrade@v1
+        uses: php-internal/actions/downgrade@846e2a397e38b869477ddfc8d2a204f7e509d126 # v1
         with:
           php-version: '8.1'
           dependency-versions: ${{ matrix.dependencies }}
@@ -152,13 +163,15 @@ jobs:
 
       # Execution
       - name: Execute Tests
-        run: ${{ inputs.run }}${{ inputs.codecov && ' --coverage-clover=coverage.clover' || '' }}
+        run: ${{ inputs.run }}${{ env.CODECOV_JOB == 'true' && ' --coverage-clover=coverage.clover' || '' }}
 
       - name: Upload coverage to Codecov
-        if: ${{ inputs.codecov }}
-        uses: codecov/codecov-action@v5
+        if: env.CODECOV_JOB == 'true'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.clover
+          # Only the report written above: reports a project configures itself would be uploaded twice.
+          disable_search: true
           name: php-${{ matrix.php }}-${{ matrix.os }}-${{ matrix.dependencies }}
           fail_ci_if_error: false
