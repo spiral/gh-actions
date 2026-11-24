@@ -39,8 +39,10 @@ jobs:
 
       - name: Configure environment
         run: |
-          export COMPOSER_ROOT_VERSION=$(/usr/bin/jq --null-input --raw-output 'first(inputs["extra"]["branch-alias"])[]' composer.json)
-          echo COMPOSER_ROOT_VERSION=$COMPOSER_ROOT_VERSION >> $GITHUB_ENV
+          version=$(/usr/bin/jq --raw-output 'first(.extra["branch-alias"][]?) // ""' composer.json)
+          if [ -n "$version" ]; then
+            echo "COMPOSER_ROOT_VERSION=$version" >> "$GITHUB_ENV"
+          fi
 
       - name: Setup PHP ${{ matrix.php }}
         uses: shivammathur/setup-php@v2
